@@ -10,22 +10,14 @@ struct node {
 	struct node *next;
 };
 
-/*Node having info regarding indegree and outdegree
-It is used as head node for each list*/
-struct nodeHead {
-	int inDegree, outDegree;
-	struct node *adjNode;
-};
-
-
 struct graph {
 	int V;
-	struct nodeHead *adjList;
+	struct node **adjList;
 };
 typedef struct graph Graph;
 
 
-/*Creates a new simple node*/
+/*Creates a new node*/
 struct node* makeNode(int x, int w) {
 	struct node*  temp = (struct node* )malloc(sizeof(struct node));
 	temp->data = x;
@@ -39,61 +31,58 @@ Graph* createNewGraph(int V) {
 	Graph* g = (Graph*)calloc(1, sizeof(struct graph));
 	g->V = V;
 	/*Creates an array of head nodes*/
-	g->adjList = (struct nodeHead*)calloc(V, sizeof(struct nodeHead));
+	g->adjList = (struct node**)calloc(V, sizeof(struct node*));
 	return g;
 }
 
 
 /*Adds a new edge to the graph, bidir acts as if the edge is bidirectional or not*/
-void addEdgeModified(struct nodeHead *adjList, int x, int y, int w, int bidir ) {
+void addEdgeModified(struct node **adjList, int x, int y, int w, int bidir) {
 
 	/*Checks if given adjacency list is empty*/
-	if (adjList[x].adjNode == NULL) {
-		adjList[x].adjNode = makeNode(y, w);
-		adjList[x].outDegree += 1;
-		adjList[y].inDegree += 1;
+	if (adjList[x] == NULL) {
+		adjList[x] = makeNode(y, w);
 
 	}
 	else { /*Else adds the new vertex to the end of the list*/
-		struct node *temp = adjList[x].adjNode;
+		struct node *temp = adjList[x];
 		while (temp->next) {
 			temp = temp->next;
 		}
-		adjList[x].outDegree += 1;
-		adjList[y].inDegree += 1;
 		temp->next = makeNode(y, w);
 	}
 
 	/*If edge is bidirectional then execute this portion of code*/
-	if (bidir && adjList[y].adjNode == NULL) {
-		adjList[y].adjNode = makeNode(x, w);
-		adjList[y].outDegree += 1;
-		adjList[x].inDegree += 1;
+	if (bidir && adjList[y] == NULL) {
+		adjList[y] = makeNode(x, w);
 	}
 	else if (bidir) { /*Similarly adds the next vertex to the end of the list*/
-		struct node *temp = adjList[y].adjNode;
+		struct node *temp = adjList[y];
 		while (temp->next) {
 			temp = temp->next;
 		}
-		adjList[y].outDegree += 1;
-		adjList[x].inDegree += 1;
 		temp->next = makeNode(x, w);
 	}
 }
 
-/*Utility function to do depth-first-search on a vertex*/
-int dfsVisit(struct nodeHead *adjList, int src, int *visited, int* callStack) {
+/*Utility function to do Depth-First-Search on a vertex*/
+int dfsVisit(struct node **adjList, int src, int *visited, int *parent, int* callStack) {
 	visited[src] = 1;
 	callStack[src] = 1; //To indicate that the current vertex is in call stack
-	struct node *temp = adjList[src].adjNode;
+	struct node *temp = adjList[src];
 	int flag = 0;
 
 	/*Visiting all the vertices adjacent to src*/
 	while (temp) {
 		int j  = temp->data;
-		if (visited[j] == 0 && dfsVisit(adjList, j, visited, callStack)) {
-			return 1;
-		} else if (callStack[j] == 1) { //If the current vertex is in call stack that means there is a back edge
+		if (visited[j] == 0 ) {
+			parent[j] = src;
+			if (dfsVisit(adjList, j, visited, parent, callStack) == 1) {
+				printf("Cycle Edge from %d to %d\n", src, j);
+				return 1;
+			}
+		} else if (callStack[j] == 1) {
+			printf("Back Edge from %d to %d\n", src, j);//If the current vertex is in call stack that means there is a back edge
 			return 1;
 		}
 		temp = temp->next;
@@ -103,10 +92,11 @@ int dfsVisit(struct nodeHead *adjList, int src, int *visited, int* callStack) {
 }
 
 /*Function to go over all the vertices and if necessory then do dfs on that vertex*/
-int dfs(struct nodeHead *adjList, int V) {
+int dfs(struct node **adjList, int *parent, int V) {
 	/*Initialization*/
 	int *visited = new int[V];
 	int *callStack = new int[V];
+
 	int isCycle;
 
 	for (int i = 0; i < V; ++i)
@@ -118,7 +108,8 @@ int dfs(struct nodeHead *adjList, int V) {
 	for (int i = 0; i < V; ++i)
 	{
 		if (visited[i] == 0) {
-			if ((isCycle = dfsVisit(adjList, i, visited, callStack)) == 1)
+			parent[i] = -1;
+			if ((isCycle = dfsVisit(adjList, i, visited, parent, callStack)) == 1)
 				return isCycle;
 
 		}
@@ -126,26 +117,27 @@ int dfs(struct nodeHead *adjList, int V) {
 	return isCycle;
 }
 
-/*Function to do topological sort*/
-vector<int> topologicalSort(struct nodeHead *adjList, int V) {
+/*Function to do topological sort,on the basis of indegree of a vertex*/
+vector<int> topologicalSort(struct node **adjList, int *inDegree , int V) {
 	queue<int> q;
 	vector<int> topologicalOrder;
 	int i;
-	/*Going over all the vertices,if outdegree is 0 then push that vertex on the queue*/
+	/*Going over all the vertices,if indegree is 0 then push that vertex on the queue
+	As there is no pe-requisite for this vertex*/
 	for (i = 0; i < V; ++i)
 	{
-		if (adjList[i].inDegree == 0)
+		if (inDegree[i] == 0)
 			q.push(i);
 	}
 	while (!q.empty()) {
 		i = q.front();
 		topologicalOrder.push_back(i);
 		q.pop();
-		struct node *temp = adjList[i].adjNode;
+		struct node *temp = adjList[i];
 		while (temp) {
 			int j = temp->data;
-			adjList[j].inDegree--;
-			if (adjList[j].inDegree == 0)
+			inDegree[j]--;
+			if (inDegree[j] == 0)
 				q.push(j);
 			temp = temp->next;
 		}
@@ -154,12 +146,12 @@ vector<int> topologicalSort(struct nodeHead *adjList, int V) {
 }
 
 /*Function to print the given graph*/
-void printGraph(struct nodeHead *adjList, int V) {
+void printGraph(struct node **adjList, int *inDegree, int V) {
 	for (int i = 0; i < V; ++i)
 	{
-		printf("inDegree and outDegree of node %d is %d and %d\n", i, adjList[i].inDegree, adjList[i].outDegree);
+		printf("inDegree of node %d is %d\n", i, inDegree[i]);
 		printf("Nodes adjacent to %d --> ", i);
-		struct node *temp = adjList[i].adjNode;
+		struct node *temp = adjList[i];
 
 		while (temp) {
 			printf("%d %d\t", temp->data, temp->wt);
@@ -178,6 +170,12 @@ int main() {
 
 	/*Creates a new graph*/
 	Graph* G = createNewGraph(V);
+	int *inDegree = (int *)calloc(V, sizeof(int));
+	int *parent = new int[V];
+	for (int i = 0; i < V; ++i)
+	{
+		parent[i] = -1;
+	}
 
 	/*Take input for the edges*/
 	// 6 10
@@ -194,31 +192,32 @@ int main() {
 	for (int i = 0; i < n; ++i)
 	{
 		scanf("%d %d %d %d", &x, &y, &w, &bidir);
+		if (bidir) {
+			inDegree[x]++;
+			inDegree[y]++;
+		} else {
+			inDegree[y]++;
+		}
 		addEdgeModified(G->adjList, x, y, w, bidir);
 	}
 
 	/*Function to print the given graph*/
-	printGraph(G->adjList, V);
+	//printGraph(G->adjList, inDegree, V);
 
-	int isCycle = 0;
-	struct nodeHead *adjList = G->adjList;
-
-	/*Calling  topologicalSort function to do a topological sort*/
-	vector<int> topoOrder = topologicalSort(G->adjList, V);
+	int isCycle = dfs(G->adjList, parent, V);
 
 	/*Check for cycle*/
-	for (int i = 0; i < V; ++i)
-	{
-		if (adjList[i].inDegree > 0) {
-			isCycle = 1;
-			break;
-		}
-	}
-
 	if (isCycle) { //If there is a cycle, prints error message
 		printf("There is a cycle in the graph\n");
+		for (int i = 0; i < V; ++i)
+		{
+			printf("%d ", parent[i]);
+		} printf("\n");
 	}
-	else { //Else prints the topological ordering
+	else {
+		/*Calling  topologicalSort function to do a topological sort*/
+		vector<int> topoOrder = topologicalSort(G->adjList, inDegree, V);
+		//Prints the topological ordering
 		printf("%s", "Topological ordering is --> ");
 		for (int i = 0; i < topoOrder.size(); ++i)
 		{
