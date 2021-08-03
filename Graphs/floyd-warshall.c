@@ -15,8 +15,8 @@ So D(x,y,0) = Shortest path between x and y that doesn't use any intermediate no
 	D(x,y,k) = min(shortest path from x to y that doesn't uses k as intermediate node, shortest path from x to y that does uses k as intermediatory
 			 = min(D(x,y,k-1), D(x,k,k-1)+D(k,y,k-1))
 	When we use k as intermediate node then it splits up into part 1. Shortest path from x to k which uses 1 to k-1 as intermediate nodes
-																   2.  Shortest path from k to y which uses 1 to k-1 as intermediate nodes
-																   k-1 because we have used k
+								       2.  Shortest path from k to y which uses 1 to k-1 as intermediate nodes
+								       k-1 because we have used k
 
 	D(x,y,n) = Is what we are looking for, shortest path from x to y using 1 to n as intermediate nodes
 	If we simply run this recursive code it will take exponential time and there are overlapping subproblems
